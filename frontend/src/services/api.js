@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+// Vercel environment values are often pasted with a trailing slash. API paths
+// below begin with `/`, so normalize the base to prevent requests like `//api`.
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
 async function api(path, options = {}) {
   let response;

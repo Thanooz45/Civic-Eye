@@ -14,8 +14,8 @@ placeholders and is a reference, not a runtime configuration file.
 
 Create a Blueprint from the repository root and select `render.yaml`. Render
 builds the service from `backend/` and starts FastAPI on its assigned port.
-Initially enter `http://localhost:5173` for `CORS_ORIGINS`; update it after the
-Vercel URL is known. Provide these values when Render prompts for them:
+`CORS_ORIGINS` is set to `https://civic-eye-zeta.vercel.app`. Provide these
+values when Render prompts for them:
 
 The Blueprint selects Render's free plan to avoid starting a paid service
 without your approval. Render's free web services sleep after 15 minutes idle
@@ -51,17 +51,16 @@ Import the same repository as a Vercel project and set **Root Directory** to
 `frontend`. Vercel detects Vite; the build command is `npm run build` and the
 output directory is `dist`. Add this environment variable for Production:
 
-- `VITE_API_BASE`: the Render HTTPS base URL, such as
-  `https://civic-eye-api.onrender.com`.
+- `VITE_API_BASE`: `https://civic-eye-oviv.onrender.com`.
 
 Deploy the frontend and copy its production HTTPS origin. Vite embeds
 `VITE_API_BASE` at build time, so redeploy after changing it.
 
 ## 4. Allow the frontend in Render
 
-Update Render's `CORS_ORIGINS` to the exact Vercel production origin and redeploy
-the backend. The backend must allow the Vercel origin, and the frontend's
-`VITE_API_BASE` must point to Render, or browser API requests will be blocked.
+The backend allows the exact Vercel production origin, and the frontend points
+to the Render API. If either service URL changes, update both settings and
+redeploy the affected service.
 
 ## Local development
 

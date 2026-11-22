@@ -1,4 +1,5 @@
 # Environment files and credentials. Keep safe templates in Git.
+.ourenv
 **/.env
 **/.env.*
 !**/.env.example
