@@ -14,13 +14,9 @@ placeholders and is a reference, not a runtime configuration file.
 
 Create a Blueprint from the repository root and select `render.yaml`. Render
 builds the service from `backend/` and starts FastAPI on its assigned port.
-`CORS_ORIGINS` is set to `https://civic-eye-zeta.vercel.app`. Provide these
-values when Render prompts for them:
-
-The Blueprint selects Render's free plan to avoid starting a paid service
-without your approval. Render's free web services sleep after 15 minutes idle
-and can take about a minute to wake. Upgrade the service to a paid plan before
-relying on it for public users. See [Render free service limits](https://render.com/docs/free).
+The service uses the Singapore region and Starter plan. `CORS_ORIGINS` is set
+to `https://civic-eye-zeta.vercel.app`. Provide these values when Render
+prompts for them:
 
 - `MONGODB_URL`: the MongoDB Atlas connection string for the production database.
 - `AI_API_KEY`: Gemini key (optional when Groq is available).
@@ -34,9 +30,9 @@ separate department secret for each of these settings: `CIVIC_DEPT_ROAD_MAINTENA
 `CIVIC_DEPT_WATER_SUPPLY_ACCESS_CODE`, `CIVIC_DEPT_DRAINAGE_ACCESS_CODE`,
 `CIVIC_DEPT_ELECTRICAL_MAINTENANCE_ACCESS_CODE`, and
 `CIVIC_DEPT_GENERAL_ACCESS_CODE`. Use unique secrets of at least 16 characters
-and deliver each one only to its department through a private channel. Demo
-codes are shown only in the local development build; they are omitted from the
-production frontend. Never reuse the local demo codes for staff accounts.
+and deliver each one only to its department through a private channel. The
+sign-in page currently displays reference codes for the demo setup. Replace
+those values and remove the reference list before using real government data.
 Allow the Render service's outbound addresses in MongoDB Atlas Network Access.
 The backend fails startup if it cannot reach MongoDB; it does not write reports
 to a local substitute.
