@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from datetime import datetime, timezone
+from typing import Optional
+import re
+
+from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field
-import re
 
 from app.core.database import get_db
 from app.services.ai_review import answer_civic_question
@@ -45,16 +48,108 @@ async def public_incidents_geojson(db: AsyncIOMotorDatabase = Depends(get_db)):
 
 
 @router.get("/stats")
-async def public_stats(db: AsyncIOMotorDatabase = Depends(get_db)):
-    counts = await db.incidents.aggregate(
-        [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
-    ).to_list(length=None)
-    by_status = {item["_id"]: item["count"] for item in counts}
+async def public_stats(
+    category: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    query = {}
+    if category and category.strip():
+        query["category"] = category.strip().upper()
+    date_filter = {}
+    if from_date and from_date.strip():
+        try:
+            date_filter["$gte"] = datetime.fromisoformat(from_date.strip())
+        except ValueError:
+            pass
+    if to_date and to_date.strip():
+        try:
+            date_filter["$lte"] = datetime.fromisoformat(to_date.strip())
+        except ValueError:
+            pass
+    if date_filter:
+        query["created_at"] = date_filter
+
+    documents = await db.incidents.find(query).to_list(length=None)
+    now = datetime.now(timezone.utc)
+
+    total = len(documents)
+    closed_docs = [d for d in documents if d.get("status") == "CLOSED"]
+    open_docs = [d for d in documents if d.get("status") != "CLOSED"]
+    in_progress_docs = [d for d in documents if d.get("status") in {"IN_PROGRESS", "ASSIGNED"}]
+
+    overdue_count = 0
+    for d in open_docs:
+        due = d.get("sla_due_at")
+        if due:
+            if isinstance(due, str):
+                try:
+                    due = datetime.fromisoformat(due)
+                except ValueError:
+                    due = None
+            if due:
+                if due.tzinfo is None:
+                    due = due.replace(tzinfo=timezone.utc)
+                if due < now:
+                    overdue_count += 1
+
+    resolution_times = []
+    for d in closed_docs:
+        c_at = d.get("created_at")
+        u_at = d.get("updated_at")
+        if c_at and u_at:
+            if isinstance(c_at, str):
+                try:
+                    c_at = datetime.fromisoformat(c_at)
+                except ValueError:
+                    c_at = None
+            if isinstance(u_at, str):
+                try:
+                    u_at = datetime.fromisoformat(u_at)
+                except ValueError:
+                    u_at = None
+            if c_at and u_at:
+                diff_hours = (u_at - c_at).total_seconds() / 3600.0
+                if diff_hours >= 0:
+                    resolution_times.append(diff_hours)
+
+    avg_resolution_hours = round(sum(resolution_times) / len(resolution_times), 1) if resolution_times else None
+
+    by_category = {}
+    by_department = {}
+    for d in documents:
+        cat = d.get("category", "OTHER")
+        dept = d.get("department", "GENERAL")
+        st = d.get("status", "SUBMITTED")
+        is_closed = (st == "CLOSED")
+
+        if cat not in by_category:
+            by_category[cat] = {"total": 0, "open": 0, "closed": 0}
+        by_category[cat]["total"] += 1
+        if is_closed:
+            by_category[cat]["closed"] += 1
+        else:
+            by_category[cat]["open"] += 1
+
+        if dept not in by_department:
+            by_department[dept] = {"total": 0, "open": 0, "closed": 0}
+        by_department[dept]["total"] += 1
+        if is_closed:
+            by_department[dept]["closed"] += 1
+        else:
+            by_department[dept]["open"] += 1
+
     return {
-        "total": sum(by_status.values()),
-        "open": sum(count for status, count in by_status.items() if status != "CLOSED"),
-        "closed": by_status.get("CLOSED", 0),
-        "demo_data": False,
+        "total": total,
+        "open": len(open_docs),
+        "closed": len(closed_docs),
+        "in_progress": len(in_progress_docs),
+        "overdue": overdue_count,
+        "avg_resolution_hours": avg_resolution_hours,
+        "by_category": by_category,
+        "by_department": by_department,
+        "demo_data": any(d.get("is_demo") for d in documents),
     }
 
 

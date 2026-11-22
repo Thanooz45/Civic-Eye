@@ -23,7 +23,7 @@ export function IssueQueue({ notify, onOpen, department = "", isHead = false }) 
   };
   useEffect(() => { load(); }, []);
   useEffect(() => { const interval = window.setInterval(() => load(true), 15000); return () => window.clearInterval(interval); }, []);
-  const visible = useMemo(() => items.filter((item) => (!status || item.status === status) && (!query || [item.incident_code, item.title, item.description, item.category, item.department].some((value) => String(value || "").toLowerCase().includes(query.toLowerCase())))), [items, status, query]);
+  const visible = useMemo(() => items.filter((item) => (!status || item.status === status) && (!query || [item.incident_code, item.title, item.description, item.category, item.department, item.pollution_subtype].some((value) => String(value || "").toLowerCase().includes(query.toLowerCase())))), [items, status, query]);
   const openIssue = (item) => { setSelected(item); onOpen(item); };
   const filteredStatuses = [...new Set(items.map((item) => item.status))].sort();
   const departmentStats = Object.entries(items.reduce((totals, item) => { const name = item.department || "Unassigned"; totals[name] ||= { total: 0, open: 0, community: 0 }; totals[name].total += 1; totals[name].community += Number(item.report_count || 1); if (item.status !== "CLOSED") totals[name].open += 1; return totals; }, {})).sort((a, b) => b[1].open - a[1].open);

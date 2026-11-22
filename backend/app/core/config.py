@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     CIVIC_DEPT_DRAINAGE_ACCESS_CODE: str = ""
     CIVIC_DEPT_ELECTRICAL_MAINTENANCE_ACCESS_CODE: str = ""
     CIVIC_DEPT_GENERAL_ACCESS_CODE: str = ""
+    CIVIC_DEPT_POLLUTION_CONTROL_ACCESS_CODE: str = ""
 
     # ------------------------------------------------------------------
     # AI Engine

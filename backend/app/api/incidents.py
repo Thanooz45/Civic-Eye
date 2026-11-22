@@ -17,6 +17,13 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.api.auth import require_city_team, optional_staff
 from app.models import Incident
+from app.ai.schemas import IssueCategory, Department, Priority
+from app.services.intelligence import (
+    CATEGORY_DEPARTMENTS,
+    calculate_severity,
+    estimate_hazard,
+    corroboration_score,
+)
 
 router = APIRouter()
 
@@ -77,6 +84,7 @@ def incident_response(incident: Incident, include_evidence: bool = False) -> dic
         "updated_at": incident.updated_at.isoformat(),
         "repair_status": incident.repair_status,
         "repair_reason": incident.repair_reason,
+        "pollution_subtype": incident.pollution_subtype,
         "is_demo": incident.is_demo,
     }
     if include_evidence:
@@ -135,7 +143,7 @@ async def send_message(payload: DepartmentMessage, db: AsyncIOMotorDatabase = De
     return {"id": str(result.inserted_id), "from": from_role, "department": department, "message": doc["message"], "created_at": doc["created_at"].isoformat()}
 
 
-DEPARTMENTS = ("ROAD_MAINTENANCE", "ROADS_ENGINEERING", "MUNICIPAL_SANITATION", "WATER_SUPPLY", "DRAINAGE", "ELECTRICAL_MAINTENANCE", "GENERAL")
+DEPARTMENTS = ("ROAD_MAINTENANCE", "ROADS_ENGINEERING", "MUNICIPAL_SANITATION", "WATER_SUPPLY", "DRAINAGE", "ELECTRICAL_MAINTENANCE", "GENERAL", "POLLUTION_CONTROL")
 
 
 def staff_participant(staff: dict) -> str:
@@ -282,10 +290,14 @@ async def get_incident_detail(incident_id: str, db: AsyncIOMotorDatabase = Depen
     result = incident_response(incident, include_evidence=True)
     report_media = await db.citizen_reports.find(
         {"incident_id": incident_id},
-        {"photo_url": 1, "photo_urls": 1, "video_urls": 1, "_id": 0},
+        {"photo_url": 1, "photo_urls": 1, "video_urls": 1, "audio_urls": 1, "_id": 0},
     ).to_list(length=None)
     result["photos"] = list(dict.fromkeys(url for report in report_media for url in (report.get("photo_urls") or ([report["photo_url"]] if report.get("photo_url") else []))))
     result["videos"] = list(dict.fromkeys(url for report in report_media for url in report.get("video_urls", [])))
+    if staff:
+        result["audios"] = list(dict.fromkeys(url for report in report_media for url in report.get("audio_urls", [])))
+    else:
+        result["audios"] = []
     return result
 
 
@@ -442,3 +454,123 @@ async def approve_resolution(
         },
     )
     return {"incident_id": incident_id, "status": "CLOSED", "approved_by": payload.approved_by}
+
+
+class TriageCorrection(BaseModel):
+    category: Optional[str] = None
+    department: Optional[str] = None
+    priority: Optional[str] = None
+    reason: str = Field(min_length=5, max_length=500)
+    actor: str = Field(min_length=2, max_length=64)
+
+
+class ReopenRequest(BaseModel):
+    reason: str = Field(min_length=10, max_length=500)
+    actor: str = Field(default="CITY_TEAM", min_length=2, max_length=64)
+
+
+@router.patch("/{incident_id}/triage", dependencies=[Depends(require_city_team)])
+async def correct_triage(
+    incident_id: str,
+    payload: TriageCorrection,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    staff: dict = Depends(require_city_team),
+):
+    incident = await get_incident(db, incident_id)
+    ensure_department_access(staff, incident)
+    updates = {}
+    changes = []
+    now = datetime.now(timezone.utc)
+
+    if payload.category:
+        try:
+            cat_enum = IssueCategory(payload.category.upper())
+            updates["category"] = cat_enum.value
+            changes.append(f"Category: {incident.category} → {cat_enum.value}")
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Invalid category: {payload.category}")
+        # Recalculate severity if category changed
+        severity = calculate_severity(
+            estimate_hazard(cat_enum, incident.description_en),
+            corroboration=corroboration_score(incident.report_count),
+        )
+        updates["severity_score"] = severity.final_score
+        updates["priority"] = severity.priority.value
+        updates["score_breakdown"] = severity.model_dump(mode="json")
+        # Automatically update department if not explicitly provided
+        if not payload.department and cat_enum in CATEGORY_DEPARTMENTS:
+            updates["department"] = CATEGORY_DEPARTMENTS[cat_enum].value
+            changes.append(f"Department routed to {CATEGORY_DEPARTMENTS[cat_enum].value}")
+
+    if payload.department:
+        dep_val = payload.department.upper()
+        if dep_val not in DEPARTMENTS and dep_val not in [d.value for d in Department]:
+            raise HTTPException(status_code=422, detail=f"Invalid department: {payload.department}")
+        updates["department"] = dep_val
+        changes.append(f"Department: {incident.department} → {dep_val}")
+
+    if payload.priority:
+        try:
+            prio_enum = Priority(payload.priority.upper())
+            updates["priority"] = prio_enum.value
+            changes.append(f"Priority: {incident.priority} → {prio_enum.value}")
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Invalid priority: {payload.priority}")
+
+    if not changes:
+        raise HTTPException(status_code=422, detail="Provide at least one change (category, department, or priority).")
+
+    event = {
+        "from": incident.status,
+        "to": incident.status,
+        "event": "TRIAGE_CORRECTED",
+        "reason": f"{payload.reason} ({'; '.join(changes)})",
+        "actor": payload.actor,
+        "department": updates.get("department", incident.department),
+        "timestamp": now.isoformat(),
+    }
+    updates["updated_at"] = now
+    await db.incidents.update_one(
+        {"_id": incident_id},
+        {"$set": updates, "$push": {"timeline": event}},
+    )
+    updated = await get_incident(db, incident_id)
+    return incident_response(updated)
+
+
+@router.post("/{incident_id}/reopen", dependencies=[Depends(require_city_team)])
+async def reopen_incident(
+    incident_id: str,
+    payload: ReopenRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    staff: dict = Depends(require_city_team),
+):
+    incident = await get_incident(db, incident_id)
+    ensure_department_access(staff, incident)
+    if incident.status != "CLOSED":
+        raise HTTPException(status_code=409, detail="Only closed incidents can be reopened.")
+
+    now = datetime.now(timezone.utc)
+    event = {
+        "from": "CLOSED",
+        "to": "IN_PROGRESS",
+        "event": "REOPENED",
+        "reason": payload.reason,
+        "actor": payload.actor,
+        "department": incident.department,
+        "timestamp": now.isoformat(),
+    }
+    await db.incidents.update_one(
+        {"_id": incident_id},
+        {
+            "$set": {
+                "status": "IN_PROGRESS",
+                "repair_status": "REOPENED",
+                "repair_reason": f"Incident reopened: {payload.reason}",
+                "updated_at": now,
+            },
+            "$push": {"timeline": event},
+        },
+    )
+    updated = await get_incident(db, incident_id)
+    return incident_response(updated)

@@ -12,6 +12,7 @@ from pymongo import ReturnDocument
 from PIL import Image, UnidentifiedImageError
 
 from app.ai.schemas import IssueCategory
+from app.api.auth import optional_staff
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import CitizenReport, Incident
@@ -37,16 +38,19 @@ router = APIRouter()
 
 IMAGE_SUFFIXES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 VIDEO_SUFFIXES = {"video/mp4": ".mp4", "video/webm": ".webm"}
+AUDIO_SUFFIXES = {"audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/webm": ".webm"}
 
 
 @router.post("/submit-with-evidence", status_code=status.HTTP_201_CREATED)
-async def submit_report_with_evidence(payload: str = Form(...), photos: list[UploadFile] = File(default=[]), videos: list[UploadFile] = File(default=[]), db: AsyncIOMotorDatabase = Depends(get_db)):
+async def submit_report_with_evidence(payload: str = Form(...), photos: list[UploadFile] = File(default=[]), videos: list[UploadFile] = File(default=[]), audios: list[UploadFile] = File(default=[]), db: AsyncIOMotorDatabase = Depends(get_db)):
     try:
         report_payload = CreateReportRequest.model_validate_json(payload)
     except Exception:
         raise HTTPException(status_code=422, detail="Report details are invalid.") from None
     if len(photos) > 5 or len(videos) > 3:
         raise HTTPException(status_code=422, detail="Attach up to 5 photos and 3 videos.")
+    if len(audios) > 2:
+        raise HTTPException(status_code=422, detail="Attach up to 2 audio files.")
     photo_data = []
     for photo in photos:
         content_type = (photo.content_type or "").lower()
@@ -65,17 +69,27 @@ async def submit_report_with_evidence(payload: str = Form(...), photos: list[Upl
         if content_type not in VIDEO_SUFFIXES or not contents or len(contents) > settings.max_video_upload_bytes or not valid:
             raise HTTPException(status_code=415, detail="Choose valid MP4 or WEBM videos under the size limit.")
         video_data.append((contents, content_type))
+    audio_data = []
+    for audio in audios:
+        content_type = (audio.content_type or "").lower()
+        contents = await audio.read(settings.max_upload_bytes + 1)
+        if content_type not in AUDIO_SUFFIXES or not contents or len(contents) > settings.max_upload_bytes:
+            raise HTTPException(status_code=415, detail="Choose valid audio files (MP3, WAV, OGG, M4A) under 10 MB each.")
+        audio_data.append((contents, content_type))
     report = await create_report(report_payload, db)
-    photo_urls, video_urls = [], []
+    photo_urls, video_urls, audio_urls = [], [], []
     for contents, content_type in photo_data:
         filename = f"{uuid4().hex}{IMAGE_SUFFIXES[content_type]}"; url = f"/api/reports/photos/{filename}"
         await db.report_photos.insert_one({"_id":filename,"report_id":report.report_id,"photo_content_type":content_type,"photo_data":contents}); photo_urls.append(url)
     for contents, content_type in video_data:
         filename = f"{uuid4().hex}{VIDEO_SUFFIXES[content_type]}"; url = f"/api/reports/videos/{filename}"
         await db.report_videos.insert_one({"_id":filename,"report_id":report.report_id,"video_content_type":content_type,"video_data":contents}); video_urls.append(url)
-    if photo_urls or video_urls:
-        await db.citizen_reports.update_one({"_id":report.report_id},{"$set":{"photo_url":photo_urls[0] if photo_urls else None,"photo_urls":photo_urls,"video_urls":video_urls}})
-    return {**report.model_dump(mode="json"),"photo_urls":photo_urls,"video_urls":video_urls}
+    for contents, content_type in audio_data:
+        filename = f"{uuid4().hex}{AUDIO_SUFFIXES[content_type]}"; url = f"/api/reports/audio/{filename}"
+        await db.report_audios.insert_one({"_id":filename,"report_id":report.report_id,"audio_content_type":content_type,"audio_data":contents}); audio_urls.append(url)
+    if photo_urls or video_urls or audio_urls:
+        await db.citizen_reports.update_one({"_id":report.report_id},{"$set":{"photo_url":photo_urls[0] if photo_urls else None,"photo_urls":photo_urls,"video_urls":video_urls,"audio_urls":audio_urls}})
+    return {**report.model_dump(mode="json"),"photo_urls":photo_urls,"video_urls":video_urls,"audio_urls":audio_urls}
 
 
 @router.post("/{report_id}/photo")
@@ -171,6 +185,19 @@ async def get_report_video(filename: str, db: AsyncIOMotorDatabase = Depends(get
     if not stored or not stored.get("video_data"):
         raise HTTPException(status_code=404, detail="Video was not found.")
     return Response(content=stored["video_data"], media_type=stored.get("video_content_type", "video/mp4"), headers={"Cache-Control": "private, max-age=300"})
+
+
+@router.get("/audio/{filename}")
+async def get_report_audio(filename: str, db: AsyncIOMotorDatabase = Depends(get_db), staff: Optional[dict] = Depends(optional_staff)):
+    """Serve citizen-submitted audio evidence. Staff-only: not exposed through public map or outcomes."""
+    if not filename or Path(filename).name != filename:
+        raise HTTPException(status_code=404, detail="Audio was not found.")
+    if staff is None:
+        raise HTTPException(status_code=403, detail="Audio evidence is only accessible to authorized city staff.")
+    stored = await db.report_audios.find_one({"_id": filename}, {"audio_data": 1, "audio_content_type": 1})
+    if not stored or not stored.get("audio_data"):
+        raise HTTPException(status_code=404, detail="Audio was not found.")
+    return Response(content=stored["audio_data"], media_type=stored.get("audio_content_type", "audio/mpeg"), headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"})
 
 
 @router.post("/analyze", response_model=ReportPreview)
@@ -297,6 +324,7 @@ async def create_report(payload: CreateReportRequest, db: AsyncIOMotorDatabase =
         incident = Incident(
             incident_code=f"CIVIC-{now.year}-{uuid4().hex[:8].upper()}",
             category=category.value,
+            pollution_subtype=payload.pollution_subtype if category == IssueCategory.POLLUTION else None,
             title=payload.title,
             description_en=payload.description_en,
             latitude=payload.latitude,
@@ -329,4 +357,8 @@ async def create_report(payload: CreateReportRequest, db: AsyncIOMotorDatabase =
         duplicate_linked=duplicate_linked,
         is_demo=False,
         needs_review=needs_review,
+        category=incident.category,
+        latitude=incident.latitude,
+        longitude=incident.longitude,
+        city=incident.city,
     )

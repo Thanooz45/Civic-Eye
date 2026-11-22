@@ -73,6 +73,16 @@ class IssueCategory(str, Enum):
     OPEN_DRAIN = "OPEN_DRAIN"
     OPEN_MANHOLE = "OPEN_MANHOLE"
     STREETLIGHT = "STREETLIGHT"
+    # Pollution categories added per project statement requirements
+    POLLUTION = "POLLUTION"
+    OTHER = "OTHER"
+
+
+class PollutionSubtype(str, Enum):
+    """Subtype selector for POLLUTION reports."""
+    AIR = "AIR"
+    WATER = "WATER"
+    NOISE = "NOISE"
     OTHER = "OTHER"
 
 
@@ -83,6 +93,7 @@ class Department(str, Enum):
     WATER_SUPPLY = "WATER_SUPPLY"
     DRAINAGE = "DRAINAGE"
     ELECTRICAL_MAINTENANCE = "ELECTRICAL_MAINTENANCE"
+    POLLUTION_CONTROL = "POLLUTION_CONTROL"
     GENERAL = "GENERAL"
 
 
@@ -129,6 +140,15 @@ class IssueAnalysisResult(BaseModel):
     # Routing
     department: Department = Field(
         description="Recommended municipal department for this issue."
+    )
+    routing_rationale: Optional[str] = Field(
+        default=None,
+        description="Plain-language explanation of why the issue was routed to this department.",
+    )
+    # Pollution subtype — only set when category == POLLUTION
+    pollution_subtype: Optional[str] = Field(
+        default=None,
+        description="Subtype for pollution reports: AIR, WATER, NOISE, or OTHER. None for non-pollution categories.",
     )
 
     # Language / transcript

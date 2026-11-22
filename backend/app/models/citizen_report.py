@@ -13,6 +13,10 @@ class CitizenReport(BaseModel):
     input_language: str = "en"
     original_transcript: Optional[str] = None
     description_en: str
+    photo_url: Optional[str] = None
+    photo_urls: list[str] = Field(default_factory=list)
+    video_urls: list[str] = Field(default_factory=list)
+    audio_urls: list[str] = Field(default_factory=list)
     is_demo: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

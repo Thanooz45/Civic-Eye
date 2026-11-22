@@ -33,10 +33,21 @@ def test_unclear_description_is_not_promoted_to_a_civic_issue():
         ("A water leak is spreading across the road", IssueCategory.WATER_LEAKAGE),
         ("There is an open drain near the crossing", IssueCategory.OPEN_DRAIN),
         ("The broken road surface needs repair", IssueCategory.DAMAGED_ROAD),
+        ("Dense black smoke and toxic chemical fumes from the factory", IssueCategory.POLLUTION),
+        ("Noise pollution and loud machinery at night", IssueCategory.POLLUTION),
     ],
 )
 def test_demo_classifier_covers_the_other_mvp_categories(description, expected_category):
     assert analyze_description(description).category == expected_category
+
+
+def test_pollution_routing_and_rationale():
+    result = analyze_description("Industrial chemical waste water contamination in the canal")
+    assert result.category == IssueCategory.POLLUTION
+    assert result.department.value == "POLLUTION_CONTROL"
+    assert result.routing_rationale is not None
+    assert "Pollution Control" in result.routing_rationale
+    assert result.is_demo_output is True
 
 
 def test_missing_score_components_are_excluded_and_reported():

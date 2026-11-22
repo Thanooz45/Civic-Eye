@@ -38,7 +38,7 @@ async def city_team_login(payload: CityTeamLogin):
     return {"access_token": token, "token_type": "bearer", "name": name, "role": role, "department": department}
 
 
-DEPARTMENTS = ("ROAD_MAINTENANCE", "ROADS_ENGINEERING", "MUNICIPAL_SANITATION", "WATER_SUPPLY", "DRAINAGE", "ELECTRICAL_MAINTENANCE", "GENERAL")
+DEPARTMENTS = ("ROAD_MAINTENANCE", "ROADS_ENGINEERING", "MUNICIPAL_SANITATION", "WATER_SUPPLY", "DRAINAGE", "ELECTRICAL_MAINTENANCE", "GENERAL", "POLLUTION_CONTROL")
 
 
 async def require_city_team(authorization: Optional[str] = Header(default=None)) -> dict:

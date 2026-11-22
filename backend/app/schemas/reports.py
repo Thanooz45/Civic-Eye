@@ -30,6 +30,7 @@ class CreateReportRequest(BaseModel):
     input_language: str = Field(default="en", min_length=2, max_length=16)
     original_transcript: Optional[str] = Field(default=None, max_length=1000)
     merge_incident_id: Optional[str] = None
+    pollution_subtype: Optional[str] = None
 
 
 class DuplicateCandidate(BaseModel):
@@ -50,3 +51,8 @@ class ReportCreated(BaseModel):
     duplicate_linked: bool
     is_demo: bool = False
     needs_review: bool
+    category: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    city: Optional[str] = None
+    audio_urls: list = []

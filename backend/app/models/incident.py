@@ -27,6 +27,7 @@ class Incident(BaseModel):
     repair_status: Optional[str] = None
     repair_reason: Optional[str] = None
     repair_evidence: Optional[dict[str, Any]] = None
+    pollution_subtype: Optional[str] = None
     is_demo: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
