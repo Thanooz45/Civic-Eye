@@ -8,13 +8,6 @@ export function Access({ onEnter, onBack, role, setRole }) {
   const [busy, setBusy] = useState(false);
   const [codesOpen, setCodesOpen] = useState(false);
 
-  // Demo mode check: enabled by query param ?demo=true, window flag, or env var
-  const isDemoMode = Boolean(
-    window.__CIVIC_EYE_DEMO_MODE__ ||
-    import.meta.env?.VITE_DEMO_MODE === "true" ||
-    (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "true")
-  );
-
   const enter = async () => {
     setLoginError("");
     setBusy(true);
@@ -28,16 +21,21 @@ export function Access({ onEnter, onBack, role, setRole }) {
   };
 
   const demoCodes = [
-    ["Road Maintenance", "roadmaintenance101"],
-    ["Roads Engineering", "roadsengineering101"],
-    ["Municipal Sanitation", "municipalsanitation101"],
-    ["Water Supply", "watersupplyaccess101"],
-    ["Drainage", "drainageaccess101"],
-    ["Electrical Maintenance", "electricalmaintenance101"],
-    ["General Services", "generalservices101"],
-    ["Pollution Control Board", "pollutioncontrol101"],
-    ["Head of all departments", "cityteamaccess101"],
+    ["Road Maintenance", "roadmaintenance101", "CIVIC_DEPT_ROAD_MAINTENANCE_ACCESS_CODE"],
+    ["Roads Engineering", "roadsengineering101", "CIVIC_DEPT_ROADS_ENGINEERING_ACCESS_CODE"],
+    ["Municipal Sanitation", "municipalsanitation101", "CIVIC_DEPT_MUNICIPAL_SANITATION_ACCESS_CODE"],
+    ["Water Supply", "watersupplyaccess101", "CIVIC_DEPT_WATER_SUPPLY_ACCESS_CODE"],
+    ["Drainage", "drainageaccess101", "CIVIC_DEPT_DRAINAGE_ACCESS_CODE"],
+    ["Electrical Maintenance", "electricalmaintenance101", "CIVIC_DEPT_ELECTRICAL_MAINTENANCE_ACCESS_CODE"],
+    ["General Services", "generalservices101", "CIVIC_DEPT_GENERAL_ACCESS_CODE"],
+    ["Pollution Control Board", "pollutioncontrol101", "CIVIC_DEPT_POLLUTION_CONTROL_ACCESS_CODE"],
+    ["Head of all departments", "cityteamaccess101", "CITY_TEAM_ACCESS_CODE"],
   ];
+
+  const handleSelectCode = (code) => {
+    setAccessCode(code);
+    setCodesOpen(false);
+  };
 
   return (
     <main className="access-page">
@@ -103,6 +101,7 @@ export function Access({ onEnter, onBack, role, setRole }) {
                 onChange={(event) => setCityName(event.target.value)}
                 placeholder="Name shown in request activity"
               />
+
               <label htmlFor="city-team-code">Department or head access code</label>
               <input
                 id="city-team-code"
@@ -113,23 +112,36 @@ export function Access({ onEnter, onBack, role, setRole }) {
                 placeholder="Enter your confidential access code"
               />
 
-              {isDemoMode ? (
+              {/* View reference access codes button below input */}
+              <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
                 <button
                   type="button"
                   className="code-reference-link"
                   onClick={() => setCodesOpen(true)}
-                  style={{ marginTop: "6px" }}
+                  style={{ alignSelf: "flex-start", fontWeight: "600", fontSize: "13px" }}
                 >
-                  View reference demo access codes
+                  🔑 View reference access codes
                 </button>
-              ) : (
-                <small style={{ display: "block", marginTop: "6px", color: "#78867d", fontSize: "12px" }}>
-                  Department access codes are confidential credentials issued by the municipal administration.
-                </small>
-              )}
+
+                {/* Red highlight notice */}
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: "#fff5f5",
+                    border: "1px solid #fed7d7",
+                    borderLeft: "4px solid #e53e3e",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "#9b2c2c",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  <strong>⚠️ Reference Only:</strong> These codes are provided for demonstration and reference. In real government deployment, confidential access codes will be directly sent to the respective departments.
+                </div>
+              </div>
 
               {loginError && (
-                <p className="inline-error" role="alert">
+                <p className="inline-error" role="alert" style={{ marginTop: "10px" }}>
                   {loginError}
                 </p>
               )}
@@ -140,7 +152,7 @@ export function Access({ onEnter, onBack, role, setRole }) {
             </div>
           )}
 
-          <button className="button button-dark enter-button" onClick={enter} disabled={busy}>
+          <button className="button button-dark enter-button" onClick={enter} disabled={busy} style={{ marginTop: "16px" }}>
             {busy ? "Signing in…" : role === "reviewer" ? "Sign in to city team" : "Continue to Civic Eye"} <span>→</span>
           </button>
         </div>
@@ -150,7 +162,8 @@ export function Access({ onEnter, onBack, role, setRole }) {
           <span>COMMUNITY ACCESS <i /></span>
         </div>
 
-        {codesOpen && isDemoMode && (
+        {/* Modal Pop-up with red highlight notice and all department codes */}
+        {codesOpen && (
           <div className="code-modal-backdrop" role="presentation" onClick={() => setCodesOpen(false)}>
             <section
               className="code-modal"
@@ -162,23 +175,66 @@ export function Access({ onEnter, onBack, role, setRole }) {
               <button className="code-modal-close" onClick={() => setCodesOpen(false)} aria-label="Close">
                 ×
               </button>
-              <small>DEMO STAFF ACCESS (EXPLICIT DEMO MODE)</small>
-              <h2 id="codes-title">Access code references</h2>
-              <p>These synthetic reference codes match the local demo setup so you can test each role.</p>
-              <div className="code-warning">
-                <b>SYNTHETIC DEMO ONLY</b>
-                <span>Real government access codes and API keys are strictly kept server-side in secure environment configuration.</span>
+              <small>DEPARTMENT ACCESS CODES</small>
+              <h2 id="codes-title">Reference Access Codes</h2>
+              <p>Reference codes for demonstration and testing of municipal department queues.</p>
+
+              {/* Prominent Red Highlight Notice */}
+              <div
+                style={{
+                  margin: "12px 0 16px",
+                  padding: "12px 14px",
+                  background: "#fff5f5",
+                  border: "1px solid #feb2b2",
+                  borderLeft: "5px solid #e53e3e",
+                  borderRadius: "8px",
+                  color: "#9b2c2c",
+                  fontSize: "12px",
+                  lineHeight: "1.6",
+                }}
+              >
+                <b style={{ color: "#c53030", display: "block", marginBottom: "4px", fontSize: "11px", letterSpacing: "0.08em" }}>
+                  ⚠️ CONFIDENTIALITY & REAL-WORLD USE NOTICE
+                </b>
+                <span>
+                  These access codes are for <strong>reference and demonstration only</strong>. In real-world government deployment, confidential access credentials will be <strong>directly sent to the respective departments</strong> and are never published publicly.
+                </span>
               </div>
-              <ul>
-                {demoCodes.map(([name, code]) => (
-                  <li key={code}>
-                    <span>{name}</span>
-                    <code>{code}</code>
+
+              <ul style={{ maxHeight: "380px", overflowY: "auto" }}>
+                {demoCodes.map(([name, code, envKey]) => (
+                  <li key={code} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px" }}>
+                    <div>
+                      <strong style={{ display: "block", fontSize: "13px" }}>{name}</strong>
+                      <small style={{ color: "#78867d", fontSize: "11px" }}>{envKey}</small>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <code style={{ fontSize: "11px", padding: "3px 6px", background: "#f4f7f1", borderRadius: "4px" }}>
+                        {code}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCode(code)}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          color: "#216c50",
+                          background: "#e4f0e3",
+                          border: "1px solid #c9decb",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Use
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
-              <button className="button button-dark" onClick={() => setCodesOpen(false)}>
-                Got it
+
+              <button className="button button-dark" onClick={() => setCodesOpen(false)} style={{ width: "100%", marginTop: "12px" }}>
+                Close
               </button>
             </section>
           </div>
