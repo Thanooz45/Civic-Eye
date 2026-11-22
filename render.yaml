@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: civic-eye-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: APP_NAME
+        value: CIVIC EYE
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MONGODB_DATABASE
+        value: civic_eye
+      - key: MONGODB_URL
+        sync: false
+      - key: AI_PROVIDER
+        value: groq
+      - key: AI_MODEL
+        value: gemini-3.8-flash
+      - key: AI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CITY_TEAM_ACCESS_CODE
+        generateValue: true
+      - key: CIVIC_DEPT_ROAD_MAINTENANCE_ACCESS_CODE
+        sync: false
+      - key: CIVIC_DEPT_ROADS_ENGINEERING_ACCESS_CODE
+        sync: false
+      - key: CIVIC_DEPT_MUNICIPAL_SANITATION_ACCESS_CODE
+        sync: false
+      - key: CIVIC_DEPT_WATER_SUPPLY_ACCESS_CODE
+        sync: false
+      - key: CIVIC_DEPT_DRAINAGE_ACCESS_CODE
+        sync: false
+      - key: CIVIC_DEPT_ELECTRICAL_MAINTENANCE_ACCESS_CODE
+        sync: false
+      - key: CIVIC_DEPT_GENERAL_ACCESS_CODE
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

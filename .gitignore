@@ -1,0 +1,34 @@
+# Environment files and credentials. Keep safe templates in Git.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local databases and uploaded user content
+backend/*.db
+backend/*.db-*
+backend/uploads/
+backend/civic_eye.local.json
+
+# JavaScript dependencies and generated builds
+node_modules/
+dist/
+coverage/
+
+# Deployment and editor state
+.vercel/
+.render/
+.idea/
+.vscode/
+
+# OS files and logs
+.DS_Store
+*.log

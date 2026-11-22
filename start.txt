@@ -1,0 +1,40 @@
+CIVIC EYE — LOCAL DEVELOPMENT
+
+Requirements: Python 3.13, Node.js 20.19+ or 22.12+, npm, a reachable MongoDB database,
+and a valid Gemini or Groq API key for automated report review. The backend reads backend/.env. Keep that populated
+file intact; use backend/.env.example only as a reference.
+
+1. Start the backend in Terminal 1:
+
+   cd "/Users/chintalapudithanooz/Documents/Hackathon/idea forge/civic eye/backend"
+   python3.13 -m venv .venv
+   .venv/bin/python -m pip install -r requirements.txt
+   .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+
+   Startup requires MongoDB. If the connection fails, check the Atlas network
+   access list, database user credentials, and DNS/network access. The backend
+   will report the connection problem and stop instead of saving reports locally.
+   City-team staff sign in with CITY_TEAM_ACCESS_CODE from backend/.env.
+
+2. Start the React frontend in Terminal 2:
+
+   cd "/Users/chintalapudithanooz/Documents/Hackathon/idea forge/civic eye/frontend"
+   npm install
+   npm run dev
+
+3. Open http://127.0.0.1:5173 on this computer. To preview on a phone or tablet
+   on the same Wi-Fi, open http://<computer-LAN-IP>:5173 on that device.
+
+Vite proxies API calls to the backend at http://127.0.0.1:8000. Report review
+uses Groq first and falls back to Gemini when both keys are set in backend/.env.
+Reports, issue history, and uploaded report photos are stored in MongoDB.
+
+To build the React app for serving from FastAPI:
+
+   cd frontend
+   npm run build
+
+The generated frontend/dist directory is served by the backend when it exists.
+The API docs are at http://127.0.0.1:8000/api/docs.
+
+Stop each server with Ctrl+C.

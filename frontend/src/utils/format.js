@@ -1,0 +1,4 @@
+export const pretty = (value = "") => String(value).toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+export const statusTone = (value = "") => { const status = String(value).toUpperCase(); if (["CLOSED", "COMPLETED", "COMPLETE", "RESOLVED"].includes(status)) return "status-green"; if (["IN_PROGRESS", "ASSIGNED", "WORK_STARTED", "MANUAL_REVIEW_REQUIRED", "REPAIR_SUBMITTED"].includes(status)) return "status-yellow"; if (["SUBMITTED", "NEEDS_REVIEW", "RECEIVED", "OPEN"].includes(status)) return "status-red"; return "status-neutral"; };
+export const iconFor = (category = "") => ({ POTHOLE: "⌁", DAMAGED_ROAD: "⌁", GARBAGE: "✳", WATER_LEAKAGE: "◌", OPEN_DRAIN: "⌖", OPEN_MANHOLE: "◎" })[category] || "↗";
+export const formatWhen = (value) => { if (!value) return "Not recorded"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); };
